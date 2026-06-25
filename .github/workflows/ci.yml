@@ -21,14 +21,19 @@ jobs:
         with:
           fetch-depth: 2 # Required for turbo to compare against previous commits
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 24
+          cache: 'pnpm'
 
       - name: Install Dependencies
-        run: npm install
+        run: pnpm install
 
       - name: Run CI Tasks (Lint, Test, Build)
         # Turbo checks what changed since the last commit and runs selectively
@@ -53,10 +58,16 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Setup Node.js (for Turbo check)
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
+          cache: 'pnpm'
           
       - name: Install Turbo Globally
         run: npm install -g turbo
