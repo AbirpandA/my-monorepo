@@ -23,8 +23,7 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
+       
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -60,8 +59,7 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
+        # The action will automatically read pnpm@9.0.0 from your package.json's "packageManager" field
 
       - name: Setup Node.js (for Turbo check)
         uses: actions/setup-node@v4
