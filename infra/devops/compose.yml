@@ -1,0 +1,56 @@
+
+version: '3.8'
+
+services:
+  # 1. The Backend API
+  api:
+    build:
+      context: ../
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://user:password@db:5432/monorepo_db
+    depends_on:
+      - db
+
+  # 2. The Next.js Web App
+  web:
+    build:
+      context: ../
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3001:3001"
+    depends_on:
+      - api
+
+  # 3. The React Admin Dashboard
+  admin-dashboard:
+    build:
+      context: ../
+      dockerfile: apps/admin-dashboard/Dockerfile
+    ports:
+      - "3000:80" # Maps local port 3000 to NGINX's port 80
+
+  # 4. The Docs App
+  docs:
+    build:
+      context: ../
+      dockerfile: apps/docs/Dockerfile
+    ports:
+      - "3002:3002"
+
+  # 5. The Database
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: monorepo_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

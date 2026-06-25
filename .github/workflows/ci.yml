@@ -1,0 +1,95 @@
+name: Monorepo CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # -------------------------------------------------------
+  # Job 1: Test and Lint Only Changed Packages
+  # -------------------------------------------------------
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # Required for turbo to compare against previous commits
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run CI Tasks (Lint, Test, Build)
+        # Turbo checks what changed since the last commit and runs selectively
+        run: npx turbo run lint test build --filter="[HEAD^1]"
+
+  # -------------------------------------------------------
+  # Job 2: Build and Push Docker Images (Dynamic Matrix)
+  # -------------------------------------------------------
+  docker-build:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # Needed to push to GHCR natively
+    strategy:
+      # This matrix includes ALL 4 of our applications
+      matrix:
+        app: [api, web, admin-dashboard, docs]
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js (for Turbo check)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          
+      - name: Install Turbo Globally
+        run: npm install -g turbo
+
+      # Determine if this specific app (or its shared packages) changed
+      - name: Check if App Changed
+        id: filter
+        run: |
+          if npx turbo run build --filter=${{ matrix.app }}... --dry-run | grep -q "0 successful"; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.filter.outputs.changed == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        if: steps.filter.outputs.changed == 'true' && github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        if: steps.filter.outputs.changed == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.app }}:${{ github.sha }},${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.app }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
